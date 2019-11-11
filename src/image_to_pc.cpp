@@ -4,8 +4,7 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <opencv2/opencv.hpp>
-/* #include <opencv2/opencv_lib.hpp> */
-/* #include <opencv2/highgui/highgui.hpp> */
+#include <pcl/visualization/cloud_viewer.h>
 
 class ImageToPC{
 	private:
@@ -15,7 +14,8 @@ class ImageToPC{
 		/*publish*/
 		ros::Publisher pub_pc;
 		/*pcl*/
-		pcl::PointCloud<pcl::PointXYZI>::Ptr cloud {new pcl::PointCloud<pcl::PointXYZI>};
+		pcl::PointCloud<pcl::PointXYZINormal>::Ptr cloud {new pcl::PointCloud<pcl::PointXYZINormal>};
+		pcl::visualization::PCLVisualizer viewer {"image_to_pc"};
 		/*objects*/
 		cv::Mat img_depth;
 		cv::Mat img_intensity;
@@ -39,9 +39,9 @@ class ImageToPC{
 		void LoopExecution(void);
 		void LoadImage(int number);
 		void InputPC(void);
-		void GetXYZ(int row, int col, double depth, double& x, double& y, double& z);
-		void GetNormal(int row, int col, double& nx, double& ny, double& nz);
+		void GetXYZNormal(int row, int col, double depth, double& x, double& y, double& z, double& nx, double& ny, double& nz);
 		void Publication(void);
+		void Visualization(void);
 		double DegToRad(double deg);
 		double PiToPi(double angle);
 };
@@ -50,6 +50,10 @@ ImageToPC::ImageToPC()
 	:nhPrivate("~")
 {
 	pub_pc = nh.advertise<sensor_msgs::PointCloud2>("/cloud", 1);
+
+	viewer.setBackgroundColor(1, 1, 1);
+	viewer.addCoordinateSystem(1.0, "axis");
+	viewer.setCameraPosition(0.0, 0.0, 50.0, 0.0, 0.0, 0.0);
 
 	nhPrivate.param("publish_rate", publish_rate, 10.0);
 	std::cout << "publish_rate = " << publish_rate << std::endl;
@@ -87,6 +91,7 @@ void ImageToPC::LoopExecution(void)
 		LoadImage(counter);
 		InputPC();
 		Publication();
+		Visualization();
 
 		counter++;
 
@@ -129,23 +134,25 @@ void ImageToPC::InputPC(void)
 			double depth = img_depth.at<unsigned short>(i, j)*depth_max/(double)depth_step;
 			/* std::cout << "depth = "  << depth << std::endl; */
 			/* std::cout << "img_depth.at<unsigned short>(i, j) = "  << img_depth.at<unsigned short>(i, j) << std::endl; */
-			GetXYZ(i, j, depth, x, y, z);
-			GetNormal(i, j, nx, ny, nz);
-			pcl::PointXYZI tmp;
+			GetXYZNormal(i, j, depth, x, y, z, nx, ny, nz);
+			pcl::PointXYZINormal tmp;
 			tmp.x = x;
 			tmp.y = y;
 			tmp.z = z;
+			tmp.normal_x = nx;
+			tmp.normal_y = ny;
+			tmp.normal_z = nz;
 			tmp.intensity = img_intensity.at<unsigned char>(i, j);
 			cloud->points.push_back(tmp);
 		}
 	}
 }
 
-void ImageToPC::GetXYZ(int row, int col, double depth, double& x, double& y, double& z)
+void ImageToPC::GetXYZNormal(int row, int col, double depth, double& x, double& y, double& z, double& nx, double& ny, double& nz)
 {
+	/*xyz*/
 	double angle_h = DegToRad((img_depth.cols/2 - col)*(horizontal_range_max - horizontal_range_min)/(double)img_depth.cols);
 	double angle_v;
-	/* int vertical_delimit_index = (vertical_upper_range_max - vertical_upper_range_min)/vertical_upper_resolution + 2; */
 	int vertical_delimit_index = img_depth.rows/2;
 	if(row < vertical_delimit_index)	angle_v = DegToRad(vertical_upper_range_max - row*vertical_upper_resolution);	//upper
 	else	angle_v = DegToRad(vertical_lower_range_max - (row - vertical_delimit_index)*vertical_lower_resolution);	//lower
@@ -153,18 +160,35 @@ void ImageToPC::GetXYZ(int row, int col, double depth, double& x, double& y, dou
 		std::cout << fabs(angle_h) << " > M_PI" << std::endl;
 		exit(1);
 	}
-	/* std::cout << "angle_v = "  << angle_v << std::endl; */
-	/* std::cout << "angle_h = "  << angle_h << std::endl; */
-
 	x = depth*cos(angle_v)*cos(angle_h);
 	y = depth*cos(angle_v)*sin(angle_h);
 	z = depth*sin(angle_v);
-}
-
-void ImageToPC::GetNormal(int row, int col, double& nx, double& ny, double& nz)
-{
-	unsigned char rgb[3];
-	rgb[0] = img_normal.at<cv::Vec3b>(row, col)[0];
+	
+	/*normal*/
+	Eigen::Vector3d bgr(
+		(double)img_normal.at<cv::Vec3b>(row, col)[0],	//b
+		(double)img_normal.at<cv::Vec3b>(row, col)[1],	//g
+		(double)img_normal.at<cv::Vec3b>(row, col)[2]	//r
+	);
+	if(bgr(0)==0 && bgr(1)==0 && bgr(2)==0){
+		nx = 0.0;
+		ny = 0.0;
+		nz = 0.0;
+	}
+	else{
+		std::vector<Eigen::Vector3d> axes(3);
+		axes[0] = {0, 0, 1};	//b
+		/* axes[2] = {-x, -y, -z};	//r */
+		axes[2] = {-x, -y, 0};	//r
+		axes[1] = (axes[0]).cross(axes[2]);	//g
+		Eigen::Matrix3d Axes;
+		for(size_t i=0;i<axes.size();++i)	Axes.block(0, i, 3, 1) = axes[i].normalized();
+		Eigen::Vector3d normal = Axes.transpose()*bgr;
+		normal.normalize();
+		nx = normal(0);
+		ny = normal(1);
+		nz = normal(2);
+	}
 }
 
 void ImageToPC::Publication(void)
@@ -175,6 +199,17 @@ void ImageToPC::Publication(void)
 	pc_ros.header.frame_id = frame_id_name;
 	pc_ros.header.stamp = ros::Time::now();
 	pub_pc.publish(pc_ros);	
+}
+
+void ImageToPC::Visualization(void)
+{
+	viewer.removeAllPointClouds();
+
+	viewer.addPointCloudNormals<pcl::PointXYZINormal>(cloud, 1, 0.5, "cloud");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 0.0, 0.0, "cloud");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 0.5, "cloud");
+
+	viewer.spinOnce();
 }
 
 double ImageToPC::DegToRad(double deg)
