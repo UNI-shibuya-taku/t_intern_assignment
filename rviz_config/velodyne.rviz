@@ -5,7 +5,6 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
-        - /Grid1
       Splitter Ratio: 0.5
     Tree Height: 775
   - Class: rviz/Selection
@@ -77,6 +76,13 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
+      Value: true
+    - Class: rviz/Axes
+      Enabled: true
+      Length: 3
+      Name: Axes
+      Radius: 1
+      Reference Frame: <Fixed Frame>
       Value: true
   Enabled: true
   Global Options:

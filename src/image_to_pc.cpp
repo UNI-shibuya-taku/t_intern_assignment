@@ -15,9 +15,10 @@ class ImageToPC{
 		/*publish*/
 		ros::Publisher pub_pc;
 		/*pcl*/
-		pcl::PointCloud<pcl::PointXYZ>::Ptr cloud {new pcl::PointCloud<pcl::PointXYZ>};
+		pcl::PointCloud<pcl::PointXYZI>::Ptr cloud {new pcl::PointCloud<pcl::PointXYZI>};
 		/*objects*/
 		cv::Mat img_depth;
+		cv::Mat img_intensity;
 		/*parameters*/
 		double publish_rate;
 		std::string frame_id_name;
@@ -40,6 +41,7 @@ class ImageToPC{
 		void GetXYZ(int row, int col, double depth, double& x, double& y, double& z);
 		void Publication(void);
 		double DegToRad(double deg);
+		double PiToPi(double angle);
 };
 
 ImageToPC::ImageToPC()
@@ -93,13 +95,18 @@ void ImageToPC::LoopExecution(void)
 
 void ImageToPC::LoadImage(int number)
 {
+	/*depth*/
 	std::string file_name_depth = file_path + "/depth/" + std::to_string(number) + "_depth.png";
 	img_depth = cv::imread(file_name_depth);
-	/* std::cout << "img_depth = " << img_depth << std::endl; */
-	/* std::cout << "img_depth.rows = " << img_depth.rows << std::endl; */
-	/* std::cout << "img_depth.cols = " << img_depth.cols << std::endl; */
 	if(img_depth.empty()){
 		std::cout << file_name_depth  << " cannot be opened" << std::endl;
+		exit(1);
+	}
+	/*intensity*/
+	std::string file_name_intensity = file_path + "/intensity/" + std::to_string(number) + "_intensity.png";
+	img_intensity = cv::imread(file_name_intensity);
+	if(img_intensity.empty()){
+		std::cout << file_name_intensity  << " cannot be opened" << std::endl;
 		exit(1);
 	}
 }
@@ -114,10 +121,11 @@ void ImageToPC::InputPC(void)
 			/* std::cout << "depth = "  << depth << std::endl; */
 			/* std::cout << "img_depth.at<unsigned short>(i, j) = "  << img_depth.at<unsigned short>(i, j) << std::endl; */
 			GetXYZ(i, j, depth, x, y, z);
-			pcl::PointXYZ tmp;
+			pcl::PointXYZI tmp;
 			tmp.x = x;
 			tmp.y = y;
 			tmp.z = z;
+			tmp.intensity = img_intensity.at<unsigned char>(i, j);
 			cloud->points.push_back(tmp);
 		}
 	}
@@ -125,7 +133,7 @@ void ImageToPC::InputPC(void)
 
 void ImageToPC::GetXYZ(int row, int col, double depth, double& x, double& y, double& z)
 {
-	double angle_h = (img_depth.cols/2.0 - col)*DegToRad(horizontal_range_max - horizontal_range_min)/(double)img_depth.cols;
+	double angle_h = DegToRad((img_depth.cols/2 - col)*(horizontal_range_max - horizontal_range_min)/(double)img_depth.cols);
 	double angle_v;
 	int vertical_delimit_index = (vertical_upper_range_max - vertical_upper_range_min)/vertical_upper_resolution + 2;
 	/* std::cout << "vertical_delimit_index = "  << vertical_delimit_index << std::endl; */
@@ -135,6 +143,9 @@ void ImageToPC::GetXYZ(int row, int col, double depth, double& x, double& y, dou
 		std::cout << fabs(angle_h) << " > M_PI" << std::endl;
 		exit(1);
 	}
+	/* std::cout << "angle_v = "  << angle_v << std::endl; */
+	/* std::cout << "angle_h = "  << angle_h << std::endl; */
+	/* std::cout << "img_depth.cols/2.0 = "  << img_depth.cols/2.0 << std::endl; */
 
 	x = depth*cos(angle_v)*cos(angle_h);
 	y = depth*cos(angle_v)*sin(angle_h);
@@ -154,6 +165,11 @@ void ImageToPC::Publication(void)
 double ImageToPC::DegToRad(double deg)
 {
 	return deg/180.0*M_PI;
+}
+
+double ImageToPC::PiToPi(double angle)
+{
+	return atan2(sin(angle), cos(angle)); 
 }
 
 int main(int argc, char** argv)
