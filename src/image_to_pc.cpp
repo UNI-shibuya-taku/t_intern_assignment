@@ -53,7 +53,7 @@ ImageToPC::ImageToPC()
 
 	viewer.setBackgroundColor(1, 1, 1);
 	viewer.addCoordinateSystem(1.0, "axis");
-	viewer.setCameraPosition(0.0, 0.0, 50.0, 0.0, 0.0, 0.0);
+	viewer.setCameraPosition(0.0, 0.0, 100.0, 0.0, 0.0, 0.0);
 
 	nhPrivate.param("publish_rate", publish_rate, 10.0);
 	std::cout << "publish_rate = " << publish_rate << std::endl;
