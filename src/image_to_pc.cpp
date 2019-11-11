@@ -170,25 +170,18 @@ void ImageToPC::GetXYZNormal(int row, int col, double depth, double& x, double& 
 		(double)img_normal.at<cv::Vec3b>(row, col)[1],	//g
 		(double)img_normal.at<cv::Vec3b>(row, col)[2]	//r
 	);
-	if(bgr(0)==0 && bgr(1)==0 && bgr(2)==0){
-		nx = 0.0;
-		ny = 0.0;
-		nz = 0.0;
-	}
-	else{
-		std::vector<Eigen::Vector3d> axes(3);
-		axes[0] = {0, 0, 1};	//b
-		/* axes[2] = {-x, -y, -z};	//r */
-		axes[2] = {-x, -y, 0};	//r
-		axes[1] = (axes[0]).cross(axes[2]);	//g
-		Eigen::Matrix3d Axes;
-		for(size_t i=0;i<axes.size();++i)	Axes.block(0, i, 3, 1) = axes[i].normalized();
-		Eigen::Vector3d normal = Axes.transpose()*bgr;
-		normal.normalize();
-		nx = normal(0);
-		ny = normal(1);
-		nz = normal(2);
-	}
+	std::vector<Eigen::Vector3d> axes(3);
+	axes[0] = {0, 0, 1};	//b
+	/* axes[2] = {-x, -y, -z};	//r */
+	axes[2] = {-x, -y, 0};	//r
+	axes[1] = (axes[0]).cross(axes[2]);	//g
+	Eigen::Matrix3d Axes;
+	for(size_t i=0;i<axes.size();++i)	Axes.block(0, i, 3, 1) = axes[i].normalized();
+	Eigen::Vector3d normal = Axes.transpose()*bgr;
+	normal.normalize();
+	nx = normal(0);
+	ny = normal(1);
+	nz = normal(2);
 }
 
 void ImageToPC::Publication(void)
