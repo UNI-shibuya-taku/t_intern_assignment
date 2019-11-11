@@ -40,6 +40,7 @@ class ImageToPC{
 		void LoadImage(int number);
 		void InputPC(void);
 		void GetXYZNormal(int row, int col, double depth, double& x, double& y, double& z, double& nx, double& ny, double& nz);
+		double ComputeCurvature(double nx, double ny, double nz);
 		void Publication(void);
 		void Visualization(void);
 		double DegToRad(double deg);
@@ -142,6 +143,7 @@ void ImageToPC::InputPC(void)
 			tmp.normal_x = nx;
 			tmp.normal_y = ny;
 			tmp.normal_z = nz;
+			tmp.curvature = ComputeCurvature(nx, ny, nz);
 			tmp.intensity = img_intensity.at<unsigned char>(i, j);
 			cloud->points.push_back(tmp);
 		}
@@ -182,6 +184,21 @@ void ImageToPC::GetXYZNormal(int row, int col, double depth, double& x, double& 
 	nx = normal(0);
 	ny = normal(1);
 	nz = normal(2);
+}
+
+double ImageToPC::ComputeCurvature(double nx, double ny, double nz)
+{
+	double e[3] = {nx, ny, nz};
+	for(int i=0;i<3;++i){
+		for(int j=i+1;j<3;++j){
+			if(e[i] > e[j]){
+				double tmp = e[i];
+				e[i] = e[j];
+				e[j] = tmp;
+			}
+		}
+	}
+	return e[0]/(e[1] + e[1] + e[2]);
 }
 
 void ImageToPC::Publication(void)
