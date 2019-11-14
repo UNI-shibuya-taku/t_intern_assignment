@@ -1,0 +1,22 @@
+<launch>
+	<!-- rviz -->
+	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find t_intern_assignment)/rviz_config/road_extraction.rviz"/>
+
+	<!-- data reconstruction -->
+	<node pkg="t_intern_assignment" name="image_to_pc" type="image_to_pc" output="screen">
+		<param name="publish_rate" type="double" value="1"/>
+		<param name="frame_id_name" type="string" value="/velodyne"/>
+		<param name="file_path" type="string" value="/home/amsl/ozaki/job_hunting/toyota/assignment/datasets/bike_bicycle[5]/1"/>
+	</node>
+
+	<!-- main -->
+	<include file="$(find velodyne_pointcloud)/launch/32e_points.launch"/>
+    <node pkg="nodelet" type="nodelet" name="heightmap_nodelet"
+        args="load velodyne_height_map/HeightMapNodelet velodyne_nodelet_manager">
+        <param name="cell_size" value="0.25"/>
+        <param name="full_clouds" value="true"/>
+        <param name="grid_dimensions" value="200"/>
+        <param name="height_threshold" value="0.1"/>
+		<remap from="/velodyne_points" to="/cloud"/>
+    </node>
+</launch>

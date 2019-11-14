@@ -188,7 +188,9 @@ void ImageToPC::GetXYZNormal(int row, int col, double depth, double& x, double& 
 
 double ImageToPC::ComputeCurvature(double nx, double ny, double nz)
 {
-	double e[3] = {nx, ny, nz};
+	/* if(std::isnan(nx) || std::isnan(ny) && std::isnan(nz))	return	0.0; */
+	/* if(nx==0 && ny==0 && nz==0)	return	0.0; */
+	double e[3] = {fabs(nx), fabs(ny), fabs(nz)};
 	for(int i=0;i<3;++i){
 		for(int j=i+1;j<3;++j){
 			if(e[i] > e[j]){
@@ -198,6 +200,8 @@ double ImageToPC::ComputeCurvature(double nx, double ny, double nz)
 			}
 		}
 	}
+	/* std::cout << "e = " << e[0] << ", " << e[1] << ", " << e[2] << std::endl; */
+	/* std::cout << "e[0]/(e[1] + e[1] + e[2]) = " << e[0]/(e[1] + e[1] + e[2]) << std::endl; */
 	return e[0]/(e[1] + e[1] + e[2]);
 }
 
