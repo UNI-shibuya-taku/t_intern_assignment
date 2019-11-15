@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf
   PCL REQUIRED
   OpenCV REQUIRED
+  cv_bridge
 )
 
 ## System dependencies are found with CMake's conventions
@@ -196,3 +197,5 @@ include_directories(
 # catkin_add_nosetests(test)
 add_executable(image_to_pc src/image_to_pc.cpp)
 target_link_libraries(image_to_pc ${catkin_LIBRARIES})
+add_executable(data_reconstruction src/data_reconstruction.cpp)
+target_link_libraries(data_reconstruction ${catkin_LIBRARIES})
