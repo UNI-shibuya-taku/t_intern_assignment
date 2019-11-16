@@ -19,8 +19,13 @@
         <param name="height_threshold" value="0.1"/>
 		<remap from="/velodyne_points" to="/cloud"/>
     </node>
-	<node pkg="t_intern_assignment" name="road_pc_extraction" type="road_pc_extraction" output="screen">
-		<remap from="/cloud" to="/velodyne_clear"/>
-        <param name="threshold_curvature" value="0.1"/>
+	<node pkg="t_intern_assignment" name="voxel_divide_pc" type="voxel_divide_pc" output="screen">
+		<remap from="/cloud" to="/velodyne_obstacles"/>
+		<param name="voxel_size" type="double" value="5.0"/>
+		<param name="voxel_per_line" type="int" value="30"/>
 	</node>
+	<!-- <node pkg="t_intern_assignment" name="road_pc_extraction" type="road_pc_extraction" output="screen"> -->
+	<!-- 	<remap from="/cloud" to="/velodyne_clear"/> -->
+    <!--     <param name="threshold_curvature" value="0.1"/> -->
+	<!-- </node> -->
 </launch>
