@@ -5,6 +5,10 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <cv_bridge/cv_bridge.h>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
+#include <geometry_msgs/PoseStamped.h>
+#include <tf/transform_broadcaster.h>
 //#include <pcl/visualization/cloud_viewer.h>
 
 class DataReconstruction{
@@ -15,6 +19,8 @@ class DataReconstruction{
 		/*publish*/
 		ros::Publisher pub_pc;
 		ros::Publisher pub_img;
+		ros::Publisher pub_pose;
+		tf::TransformBroadcaster tf_broadcaster;
 		/*pcl*/
 		pcl::PointCloud<pcl::PointXYZINormal>::Ptr cloud {new pcl::PointCloud<pcl::PointXYZINormal>};
 		//pcl::visualization::PCLVisualizer viewer {"data_reconstruction"};
@@ -24,9 +30,12 @@ class DataReconstruction{
 		cv::Mat img_normal;
 		cv::Mat img_vision;
 		sensor_msgs::ImagePtr img_vision_ros;
+		boost::property_tree::ptree pt;
+		geometry_msgs::PoseStamped pose;
 		/*parameters*/
 		double publish_rate;
-		std::string frame_id_name;
+		std::string child_frame_name;
+		std::string parent_frame_name;
 		std::string file_path;
 		double vertical_upper_range_min;	//[deg]
 		double vertical_upper_range_max;	//[deg]
@@ -46,6 +55,8 @@ class DataReconstruction{
 		pcl::PointXYZINormal GetPointXYZINormal(int row, int col);
 		double ComputeCurvature(double nx, double ny, double nz);
 		void ImageCVToROS(void);
+		void LoadJason(int number);
+		void PtreeToPose(void);
 		void Publication(void);
 		//void Visualization(void);
 		double DegToRad(double deg);
@@ -57,6 +68,7 @@ DataReconstruction::DataReconstruction()
 {
 	pub_pc = nh.advertise<sensor_msgs::PointCloud2>("/cloud", 1);
 	pub_img = nh.advertise<sensor_msgs::Image>("/camera/vision", 1);
+	pub_pose = nh.advertise<geometry_msgs::PoseStamped>("/pose", 1);
 
 	//viewer.setBackgroundColor(1, 1, 1);
 	//viewer.addCoordinateSystem(1.0, "axis");
@@ -64,8 +76,10 @@ DataReconstruction::DataReconstruction()
 
 	nhPrivate.param("publish_rate", publish_rate, 10.0);
 	std::cout << "publish_rate = " << publish_rate << std::endl;
-	nhPrivate.param("frame_id_name", frame_id_name, std::string("/lidar"));
-	std::cout << "frame_id_name = " << frame_id_name << std::endl;
+	nhPrivate.param("child_frame_name", child_frame_name, std::string("/lidar"));
+	std::cout << "child_frame_name = " << child_frame_name << std::endl;
+	nhPrivate.param("parent_frame_name", parent_frame_name, std::string("/odom"));
+	std::cout << "parent_frame_name = " << parent_frame_name << std::endl;
 	nhPrivate.param("file_path", file_path, std::string("/path"));
 	std::cout << "file_path = " << file_path << std::endl;
 	nhPrivate.param("vertical_upper_range_min", vertical_upper_range_min, -8.33);
@@ -98,6 +112,9 @@ void DataReconstruction::LoopExecution(void)
 		LoadImage(counter);
 		ImageToPC();
 		ImageCVToROS();
+		LoadJason(counter);
+		PtreeToPose();
+
 		Publication();
 		//Visualization();
 
@@ -221,6 +238,49 @@ void DataReconstruction::ImageCVToROS(void)
 	img_vision_ros = cv_bridge::CvImage(std_msgs::Header(), "bgr8", img_vision).toImageMsg();
 }
 
+void DataReconstruction::LoadJason(int number)
+{
+	std::string file_name_pose = file_path + "/pose/" + std::to_string(number) + "_pose.json";
+	boost::property_tree::read_json(file_name_pose, pt);
+	if(pt.empty()){
+		std::cout << file_name_pose << " is empty or non-exist" << std::endl;
+		exit(1);
+	}
+}
+
+void DataReconstruction::PtreeToPose(void)
+{
+	std::vector<std::string> value_names{
+		"Pose.translation.x",
+		"Pose.translation.y",
+		"Pose.translation.z",
+		"Pose.unit_quaternion.x",
+		"Pose.unit_quaternion.y",
+		"Pose.unit_quaternion.z",
+		"Pose.unit_quaternion.w"
+	};
+	std::vector<double> values(value_names.size());
+	for(size_t i=0;i<value_names.size();++i){
+		boost::optional<double> value;
+		if(!(value = pt.get_optional<double>(value_names[i]))){
+			std::cout << value_names[i] << " is empty" << std::endl;
+			exit(1);
+		}
+		else{
+			/* std::cout << value_names[i] << " = " << value.get() << std::endl; */
+			values[i] = value.get();
+		}
+	}
+
+	pose.pose.position.x = values[0];
+	pose.pose.position.y = values[1];
+	pose.pose.position.z = values[2];
+	pose.pose.orientation.x = values[3];
+	pose.pose.orientation.y = values[4];
+	pose.pose.orientation.z = values[5];
+	pose.pose.orientation.w = values[6];
+}
+
 void DataReconstruction::Publication(void)
 {
 	ros::Time pub_time = ros::Time::now();
@@ -228,14 +288,30 @@ void DataReconstruction::Publication(void)
 	/*pc*/
 	sensor_msgs::PointCloud2 pc_ros;
 	pcl::toROSMsg(*cloud, pc_ros);
-	pc_ros.header.frame_id = frame_id_name;
+	pc_ros.header.frame_id = child_frame_name;
 	pc_ros.header.stamp = pub_time;
 	pub_pc.publish(pc_ros);	
 
 	/*image*/
-	img_vision_ros->header.frame_id = frame_id_name;
+	img_vision_ros->header.frame_id = child_frame_name;
 	img_vision_ros->header.stamp = pub_time;
 	pub_img.publish(img_vision_ros);
+
+	/*pc*/
+	pose.header.frame_id = parent_frame_name;
+	pose.header.stamp = pub_time;
+	pub_pose.publish(pose);	
+
+	/*tf broadcast*/
+    geometry_msgs::TransformStamped transform;
+	transform.header.stamp = pub_time;
+	transform.header.frame_id = parent_frame_name;
+	transform.child_frame_id = child_frame_name;
+	transform.transform.translation.x = pose.pose.position.x;
+	transform.transform.translation.y = pose.pose.position.y;
+	transform.transform.translation.z = pose.pose.position.z;
+	transform.transform.rotation = pose.pose.orientation;
+	tf_broadcaster.sendTransform(transform);
 }
 
 /*
