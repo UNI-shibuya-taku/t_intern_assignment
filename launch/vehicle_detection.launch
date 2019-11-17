@@ -28,10 +28,10 @@
 	<node pkg="t_intern_assignment" name="dynamic_pc_extraction" type="dynamic_pc_extraction" output="screen">
 		<param name="child_frame_name" type="string" value="/velodyne"/>
 		<param name="parent_frame_name" type="string" value="/odom"/>
-		<!-- <remap from="/cloud" to="/velodyne_obstacles"/> -->
-		<param name="frame_id_name" type="string" value="/velodyne"/>
-		<param name="voxel_size" type="double" value="5.0"/>
-		<param name="voxel_per_line" type="int" value="30"/>
+		<remap from="/cloud" to="/velodyne_obstacles"/>
+		<param name="voxel_size" type="double" value="1.0"/>
+		<param name="voxel_per_line" type="int" value="50"/>
+		<param name="threshold_diff_occupancyV" type="double" value="0.9"/>
 	</node>
 	<!-- <node pkg="t_intern_assignment" name="road_pc_extraction" type="road_pc_extraction" output="screen"> -->
 	<!-- 	<remap from="/cloud" to="/velodyne_clear"/> -->
