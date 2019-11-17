@@ -22,12 +22,12 @@ class DynamicPCExtraction{
 		pcl::visualization::PCLVisualizer viewer {"dynamic_pc_extraction"};
 		pcl::PointCloud<pcl::PointXYZ>::Ptr pc_current {new pcl::PointCloud<pcl::PointXYZ>};
 		pcl::PointCloud<pcl::PointXYZ>::Ptr pc_last {new pcl::PointCloud<pcl::PointXYZ>};
-		pcl::PointCloud<pcl::PointXYZ>::Ptr pc_extracted {new pcl::PointCloud<pcl::PointXYZ>};
+		pcl::PointCloud<pcl::PointXYZ>::Ptr pc_dynamic {new pcl::PointCloud<pcl::PointXYZ>};
+		pcl::PointCloud<pcl::PointXYZ>::Ptr pc_static {new pcl::PointCloud<pcl::PointXYZ>};
 		/*parameters*/
 		std::string child_frame_name;
 		std::string parent_frame_name;
 		double voxel_size;
-		double threshold_diff_occupancy;
 	public:
 		DynamicPCExtraction();
 		void CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg);
@@ -46,7 +46,7 @@ DynamicPCExtraction::DynamicPCExtraction()
 	pub_pc = nh.advertise<sensor_msgs::PointCloud2>("/cloud/dynamic", 1);
 	viewer.setBackgroundColor(1, 1, 1);
 	viewer.addCoordinateSystem(1.0, "axis");
-	viewer.setCameraPosition(0.0, 0.0, 80.0, 0.0, 0.0, 0.0);
+	viewer.setCameraPosition(0.0, 0.0, 100.0, 0.0, 0.0, 0.0);
 
 	nhPrivate.param("child_frame_name", child_frame_name, std::string("/lidar"));
 	std::cout << "child_frame_name = " << child_frame_name << std::endl;
@@ -54,8 +54,6 @@ DynamicPCExtraction::DynamicPCExtraction()
 	std::cout << "parent_frame_name = " << parent_frame_name << std::endl;
 	nhPrivate.param("voxel_size", voxel_size, 1.0);
 	std::cout << "voxel_size = " << voxel_size << std::endl;
-	nhPrivate.param("threshold_diff_occupancy", threshold_diff_occupancy, 0.5);
-	std::cout << "threshold_diff_occupancy = " << threshold_diff_occupancy << std::endl;
 }
 
 void DynamicPCExtraction::CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg)
@@ -73,7 +71,8 @@ void DynamicPCExtraction::CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg
 	}
 	Visualization();
 
-	*pc_last = *pc_current;
+	pc_last->header = pc_current->header;
+	*pc_last += *pc_current;
 }
 
 void DynamicPCExtraction::PCTransform(void)
@@ -130,7 +129,8 @@ void DynamicPCExtraction::Extraction(void)
 	double time_start = ros::Time::now().toSec();
 
 	/*initialize*/
-	pc_extracted->points.clear();
+	pc_dynamic->points.clear();
+	pc_static->points.clear();
 	std::vector<int> newPointIdxVector;
 	pcl::octree::OctreePointCloudChangeDetector<pcl::PointXYZ> octree(voxel_size);
 	/*last*/
@@ -142,12 +142,27 @@ void DynamicPCExtraction::Extraction(void)
 	octree.setInputCloud(pc_current);
 	octree.addPointsFromInputCloud();
 	/*get diff*/
-	octree.getPointIndicesFromNewVoxels(newPointIdxVector);
+	// octree.getPointIndicesFromNewVoxels(newPointIdxVector);
+	octree.getPointIndicesFromNewVoxels(newPointIdxVector, 10);
 
 	/*extract*/
-	pc_extracted->points.resize(newPointIdxVector.size());
-	for(size_t i=0;i<newPointIdxVector.size();++i){
-		pc_extracted->points[i] = pc_current->points[newPointIdxVector[i]];
+	/* pc_dynamic->points.resize(newPointIdxVector.size()); */
+	/* for(size_t i=0;i<newPointIdxVector.size();++i){ */
+	/* 	pc_dynamic->points[i] = pc_current->points[newPointIdxVector[i]]; */
+	/* } */
+	int counter_static = 0;
+	int counter_dynamic = 0;
+	pc_dynamic->points.resize(newPointIdxVector.size());
+	pc_static->points.resize(pc_current->points.size() - newPointIdxVector.size());
+	for(size_t i=0;i<pc_current->points.size();++i){
+		if(i == newPointIdxVector[counter_dynamic]){
+			pc_dynamic->points[counter_dynamic] = pc_current->points[i];
+			counter_dynamic++;
+		}
+		else{
+			pc_static->points[counter_static] = pc_current->points[i];
+			counter_static++;
+		}
 	}
 
 	std::cout << "extraction time [s] = " << ros::Time::now().toSec() - time_start << std::endl;
@@ -156,10 +171,10 @@ void DynamicPCExtraction::Extraction(void)
 void DynamicPCExtraction::Publication(void)
 {
 	/*pc*/
-	pc_extracted->header.frame_id = pc_current->header.frame_id;
-	pc_extracted->header.stamp = pc_current->header.stamp;
+	pc_dynamic->header.frame_id = pc_current->header.frame_id;
+	pc_dynamic->header.stamp = pc_current->header.stamp;
 	sensor_msgs::PointCloud2 pc_ros;
-	pcl::toROSMsg(*pc_extracted, pc_ros);
+	pcl::toROSMsg(*pc_dynamic, pc_ros);
 	pub_pc.publish(pc_ros);	
 }
 
@@ -177,10 +192,10 @@ void DynamicPCExtraction::Visualization(void)
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 0.0, 1.0, "pc_last");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, "pc_last");
 
-	/*pc_extracted*/
-	viewer.addPointCloud(pc_extracted, "pc_extracted");
-	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 0.0, 0.0, "pc_extracted");
-	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 4, "pc_extracted");
+	/*pc_dynamic*/
+	viewer.addPointCloud(pc_dynamic, "pc_dynamic");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 0.0, 0.0, "pc_dynamic");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 4, "pc_dynamic");
 	
 	viewer.spinOnce();
 }
