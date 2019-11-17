@@ -29,6 +29,7 @@ class DynamicPCExtraction{
 	public:
 		DynamicPCExtraction();
 		void CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg);
+		void PCTransform(void);
 		void Divide(void);
 		void PassThroughFilter(pcl::PointCloud<pcl::PointXYZ>::Ptr pc_in, pcl::PointCloud<pcl::PointXYZ>::Ptr pc_out, std::vector<double> range);
 		void Visualization(void);
@@ -61,53 +62,103 @@ void DynamicPCExtraction::CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg
 	std::cout << "pc->points.size() = " << pc->points.size() << std::endl;
 
 	if(!pc_last->points.empty()){
-		/*current*/
-		tf::StampedTransform tf_trans;
-		try{
-			tf_listener.lookupTransform(
-				parent_frame_name,
-				msg->header.frame_id,
-				msg->header.stamp,
-				tf_trans
-			);
-		}
-		catch (tf::TransformException ex){
-			ROS_ERROR("%s",ex.what());
-			ros::Duration(1.0).sleep();
-		}
-		/*last*/
-		tf::StampedTransform tf_trans_last;
-		ros::Time time_last;
-		pcl_conversions::fromPCL(pc_last->header.stamp, time_last);
-		try{
-			tf_listener.lookupTransform(
-				parent_frame_name,
-				pc_last->header.frame_id,
-				time_last,
-				tf_trans_last
-			);
-		}
-		catch (tf::TransformException ex){
-			ROS_ERROR("%s",ex.what());
-			ros::Duration(1.0).sleep();
-		}
-
-		tf::Quaternion relative_rotation = tf_trans_last.getRotation()*tf_trans.getRotation().inverse();
-		relative_rotation.normalize();	
-		Eigen::Quaternionf rotation(relative_rotation.w(), relative_rotation.x(), relative_rotation.y(), relative_rotation.z());
-		tf::Quaternion q_global_move(
-			tf_trans_last.getOrigin().x() - tf_trans.getOrigin().x(),
-			tf_trans_last.getOrigin().y() - tf_trans.getOrigin().y(),
-			tf_trans_last.getOrigin().z() - tf_trans.getOrigin().z(),
-			0.0
-		);
-		tf::Quaternion q_local_move = tf_trans_last.getRotation().inverse()*q_global_move*tf_trans_last.getRotation();
-		Eigen::Vector3f offset(q_local_move.x(), q_local_move.y(), q_local_move.z());
-		pcl::transformPointCloud(*pc_last, *pc_last, offset, rotation);
+		PCTransform();
+		/* #<{(|current|)}># */
+		/* tf::StampedTransform tf_trans; */
+		/* try{ */
+		/* 	tf_listener.lookupTransform( */
+		/* 		parent_frame_name, */
+		/* 		msg->header.frame_id, */
+		/* 		msg->header.stamp, */
+		/* 		tf_trans */
+		/* 	); */
+		/* } */
+		/* catch (tf::TransformException ex){ */
+		/* 	ROS_ERROR("%s",ex.what()); */
+		/* 	ros::Duration(1.0).sleep(); */
+		/* } */
+		/* #<{(|last|)}># */
+		/* tf::StampedTransform tf_trans_last; */
+		/* ros::Time time_last; */
+		/* pcl_conversions::fromPCL(pc_last->header.stamp, time_last); */
+		/* try{ */
+		/* 	tf_listener.lookupTransform( */
+		/* 		parent_frame_name, */
+		/* 		pc_last->header.frame_id, */
+		/* 		time_last, */
+		/* 		tf_trans_last */
+		/* 	); */
+		/* } */
+		/* catch (tf::TransformException ex){ */
+		/* 	ROS_ERROR("%s",ex.what()); */
+		/* 	ros::Duration(1.0).sleep(); */
+		/* } */
+        /*  */
+		/* tf::Quaternion relative_rotation = tf_trans_last.getRotation()*tf_trans.getRotation().inverse(); */
+		/* relative_rotation.normalize();	 */
+		/* Eigen::Quaternionf rotation(relative_rotation.w(), relative_rotation.x(), relative_rotation.y(), relative_rotation.z()); */
+		/* tf::Quaternion q_global_move( */
+		/* 	tf_trans_last.getOrigin().x() - tf_trans.getOrigin().x(), */
+		/* 	tf_trans_last.getOrigin().y() - tf_trans.getOrigin().y(), */
+		/* 	tf_trans_last.getOrigin().z() - tf_trans.getOrigin().z(), */
+		/* 	0.0 */
+		/* ); */
+		/* tf::Quaternion q_local_move = tf_trans_last.getRotation().inverse()*q_global_move*tf_trans_last.getRotation(); */
+		/* Eigen::Vector3f offset(q_local_move.x(), q_local_move.y(), q_local_move.z()); */
+		/* pcl::transformPointCloud(*pc_last, *pc_last, offset, rotation); */
 	}
 	Visualization();
 
 	*pc_last = *pc;
+}
+
+void DynamicPCExtraction::PCTransform(void)
+{
+	/*current*/
+	tf::StampedTransform tf_trans;
+	ros::Time time_current;
+	pcl_conversions::fromPCL(pc->header.stamp, time_current);
+	try{
+		tf_listener.lookupTransform(
+			parent_frame_name,
+			pc->header.frame_id,
+			time_current,
+			tf_trans
+		);
+	}
+	catch (tf::TransformException ex){
+		ROS_ERROR("%s",ex.what());
+		ros::Duration(1.0).sleep();
+	}
+	/*last*/
+	tf::StampedTransform tf_trans_last;
+	ros::Time time_last;
+	pcl_conversions::fromPCL(pc_last->header.stamp, time_last);
+	try{
+		tf_listener.lookupTransform(
+			parent_frame_name,
+			pc_last->header.frame_id,
+			time_last,
+			tf_trans_last
+		);
+	}
+	catch (tf::TransformException ex){
+		ROS_ERROR("%s",ex.what());
+		ros::Duration(1.0).sleep();
+	}
+	/*transformation*/
+	tf::Quaternion relative_rotation = tf_trans_last.getRotation()*tf_trans.getRotation().inverse();
+	relative_rotation.normalize();	
+	Eigen::Quaternionf rotation(relative_rotation.w(), relative_rotation.x(), relative_rotation.y(), relative_rotation.z());
+	tf::Quaternion q_global_move(
+		tf_trans_last.getOrigin().x() - tf_trans.getOrigin().x(),
+		tf_trans_last.getOrigin().y() - tf_trans.getOrigin().y(),
+		tf_trans_last.getOrigin().z() - tf_trans.getOrigin().z(),
+		0.0
+	);
+	tf::Quaternion q_local_move = tf_trans_last.getRotation().inverse()*q_global_move*tf_trans_last.getRotation();
+	Eigen::Vector3f offset(q_local_move.x(), q_local_move.y(), q_local_move.z());
+	pcl::transformPointCloud(*pc_last, *pc_last, offset, rotation);
 }
 
 void DynamicPCExtraction::Divide(void)
