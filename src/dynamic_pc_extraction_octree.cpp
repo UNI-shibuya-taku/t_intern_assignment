@@ -4,9 +4,8 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
-#include <pcl/filters/voxel_grid.h>
 #include <pcl/common/transforms.h>
-#include <pcl/filters/passthrough.h>
+#include <pcl/octree/octree.h>
 #include <pcl/visualization/cloud_viewer.h>
 
 class DynamicPCExtraction{
@@ -17,17 +16,17 @@ class DynamicPCExtraction{
 		/*subscribe*/
 		ros::Subscriber sub_pc;
 		tf::TransformListener tf_listener;
+		/*publish*/
+		ros::Publisher pub_pc;
 		/*pcl objects*/
 		pcl::visualization::PCLVisualizer viewer {"dynamic_pc_extraction"};
 		pcl::PointCloud<pcl::PointXYZ>::Ptr pc_current {new pcl::PointCloud<pcl::PointXYZ>};
 		pcl::PointCloud<pcl::PointXYZ>::Ptr pc_last {new pcl::PointCloud<pcl::PointXYZ>};
 		pcl::PointCloud<pcl::PointXYZ>::Ptr pc_extracted {new pcl::PointCloud<pcl::PointXYZ>};
-		std::vector<std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>> voxels;
 		/*parameters*/
 		std::string child_frame_name;
 		std::string parent_frame_name;
 		double voxel_size;
-		int voxel_per_line;
 		double threshold_diff_occupancy;
 	public:
 		DynamicPCExtraction();
@@ -36,6 +35,7 @@ class DynamicPCExtraction{
 		void Extraction(void);
 		void PassThroughFilter(pcl::PointCloud<pcl::PointXYZ>::Ptr pc_in, pcl::PointCloud<pcl::PointXYZ>::Ptr pc_out, std::vector<double> range);
 		bool JudgeDynamic(pcl::PointCloud<pcl::PointXYZ>::Ptr voxel_current, pcl::PointCloud<pcl::PointXYZ>::Ptr voxel_last);
+		void Publication(void);
 		void Visualization(void);
 };
 
@@ -43,6 +43,7 @@ DynamicPCExtraction::DynamicPCExtraction()
 	:nhPrivate("~")
 {
 	sub_pc = nh.subscribe("/cloud", 1, &DynamicPCExtraction::CallbackPC, this);
+	pub_pc = nh.advertise<sensor_msgs::PointCloud2>("/cloud/dynamic", 1);
 	viewer.setBackgroundColor(1, 1, 1);
 	viewer.addCoordinateSystem(1.0, "axis");
 	viewer.setCameraPosition(0.0, 0.0, 80.0, 0.0, 0.0, 0.0);
@@ -53,8 +54,6 @@ DynamicPCExtraction::DynamicPCExtraction()
 	std::cout << "parent_frame_name = " << parent_frame_name << std::endl;
 	nhPrivate.param("voxel_size", voxel_size, 1.0);
 	std::cout << "voxel_size = " << voxel_size << std::endl;
-	nhPrivate.param("voxel_per_line", voxel_per_line, 10);
-	std::cout << "voxel_per_line = " << voxel_per_line << std::endl;
 	nhPrivate.param("threshold_diff_occupancy", threshold_diff_occupancy, 0.5);
 	std::cout << "threshold_diff_occupancy = " << threshold_diff_occupancy << std::endl;
 }
@@ -70,6 +69,7 @@ void DynamicPCExtraction::CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg
 	if(!pc_last->points.empty()){
 		PCTransform();
 		Extraction();
+		Publication();
 	}
 	Visualization();
 
@@ -129,59 +129,38 @@ void DynamicPCExtraction::Extraction(void)
 {
 	double time_start = ros::Time::now().toSec();
 
+	/*initialize*/
 	pc_extracted->points.clear();
-	voxels = std::vector<std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>>(voxel_per_line, std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>(voxel_per_line));
+	std::vector<int> newPointIdxVector;
+	pcl::octree::OctreePointCloudChangeDetector<pcl::PointXYZ> octree(voxel_size);
+	/*last*/
+	octree.setInputCloud(pc_last);
+	octree.addPointsFromInputCloud();
+	/*switch*/
+	octree.switchBuffers();	
+	/*current*/
+	octree.setInputCloud(pc_current);
+	octree.addPointsFromInputCloud();
+	/*get diff*/
+	octree.getPointIndicesFromNewVoxels(newPointIdxVector);
 
-	for(int i=0;i<voxel_per_line;++i){
-		for(int j=0;j<voxel_per_line;++j){
-			pcl::PointCloud<pcl::PointXYZ>::Ptr voxel_current (new pcl::PointCloud<pcl::PointXYZ>);
-			pcl::PointCloud<pcl::PointXYZ>::Ptr voxel_last (new pcl::PointCloud<pcl::PointXYZ>);
-			std::vector<double> range{
-				(i - voxel_per_line/2)*voxel_size,
-				(i - voxel_per_line/2)*voxel_size + voxel_size,
-				(j - voxel_per_line/2)*voxel_size,
-				(j - voxel_per_line/2)*voxel_size + voxel_size
-			};
-			/*current*/
-			PassThroughFilter(pc_current, voxel_current, range);
-			/*last*/
-			PassThroughFilter(pc_last, voxel_last, range);
-			/*judge*/
-			if(JudgeDynamic(voxel_current, voxel_last)){
-				*pc_extracted += *voxel_current;
-			}
-			/*visualization*/
-			voxels[i][j] = voxel_current;
-		}
+	/*extract*/
+	pc_extracted->points.resize(newPointIdxVector.size());
+	for(size_t i=0;i<newPointIdxVector.size();++i){
+		pc_extracted->points[i] = pc_current->points[newPointIdxVector[i]];
 	}
 
 	std::cout << "extraction time [s] = " << ros::Time::now().toSec() - time_start << std::endl;
 }
 
-void DynamicPCExtraction::PassThroughFilter(pcl::PointCloud<pcl::PointXYZ>::Ptr pc_in, pcl::PointCloud<pcl::PointXYZ>::Ptr pc_out, std::vector<double> range)
+void DynamicPCExtraction::Publication(void)
 {
-	pcl::PassThrough<pcl::PointXYZ> pass;
-	pass.setInputCloud(pc_in);
-	pass.setFilterFieldName("x");
-	pass.setFilterLimits(range[0], range[1]);
-	pass.filter(*pc_out);
-	pass.setInputCloud(pc_out);
-	pass.setFilterFieldName("y");
-	pass.setFilterLimits(range[2], range[3]);
-	pass.filter(*pc_out);
-}
-
-bool DynamicPCExtraction::JudgeDynamic(pcl::PointCloud<pcl::PointXYZ>::Ptr voxel_current, pcl::PointCloud<pcl::PointXYZ>::Ptr voxel_last)
-{
-	const double eps = 1.0e-10;
-	double diff_occupancy =	abs(voxel_current->points.size() - voxel_last->points.size())/(double)(voxel_last->points.size() + eps);
-	if(diff_occupancy > 0){
-		std::cout << "diff_occupancy = " << diff_occupancy << std::endl;
-		std::cout << "voxel_current->points.size() = " << voxel_current->points.size() << std::endl;
-		std::cout << "voxel_last->points.size() = " << voxel_last->points.size() << std::endl;
-	}
-	if(diff_occupancy > threshold_diff_occupancy)	return true;
-	else	return false;
+	/*pc*/
+	pc_extracted->header.frame_id = pc_current->header.frame_id;
+	pc_extracted->header.stamp = pc_current->header.stamp;
+	sensor_msgs::PointCloud2 pc_ros;
+	pcl::toROSMsg(*pc_extracted, pc_ros);
+	pub_pc.publish(pc_ros);	
 }
 
 void DynamicPCExtraction::Visualization(void)
@@ -202,30 +181,6 @@ void DynamicPCExtraction::Visualization(void)
 	viewer.addPointCloud(pc_extracted, "pc_extracted");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 0.0, 0.0, "pc_extracted");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 4, "pc_extracted");
-
-	/* #<{(|voxels|)}># */
-	/* if(!voxels.empty()){ */
-	/* 	double rgb[3] = {}; */
-	/* 	const int channel = 3; */
-	/* 	const double step = ceil(pow(voxel_per_line*voxel_per_line+2, 1.0/(double)channel));	//exept (000),(111) */
-	/* 	const double max = 1.0; */
-	/* 	for(int i=0;i<voxel_per_line;i++){ */
-	/* 		for(int j=0;j<voxel_per_line;j++){ */
-	/* 			int index = i*voxel_per_line + j; */
-	/* 			std::string name = "voxel_" + std::to_string(index); */
-	/* 			rgb[0] += 1/step; */
-	/* 			for(int c=0;c<channel-1;c++){ */
-	/* 				if(rgb[c]>max){ */
-	/* 					rgb[c] -= max + 1/step; */
-	/* 					rgb[c+1] += 1/step; */
-	/* 				} */
-	/* 			} */
-	/* 			viewer.addPointCloud(voxels[i][j], name); */
-	/* 			viewer.setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, rgb[0], rgb[1], rgb[2], name); */
-	/* 			viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, name); */
-	/* 		} */
-	/* 	} */
-	/* } */
 	
 	viewer.spinOnce();
 }

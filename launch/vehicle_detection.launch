@@ -20,21 +20,20 @@
         <param name="height_threshold" value="0.1"/>
 		<remap from="/velodyne_points" to="/cloud"/>
     </node>
-	<!-- <node pkg="t_intern_assignment" name="voxel_divide_pc" type="voxel_divide_pc" output="screen"> -->
+	<!-- <node pkg="t_intern_assignment" name="dynamic_pc_extraction" type="dynamic_pc_extraction" output="screen"> -->
+	<!-- 	<param name="child_frame_name" type="string" value="/velodyne"/> -->
+	<!-- 	<param name="parent_frame_name" type="string" value="/odom"/> -->
 	<!-- 	<remap from="/cloud" to="/velodyne_obstacles"/> -->
-	<!-- 	<param name="voxel_size" type="double" value="5.0"/> -->
-	<!-- 	<param name="voxel_per_line" type="int" value="30"/> -->
+	<!-- 	<param name="voxel_size" type="double" value="2.0"/> -->
+	<!-- 	<param name="voxel_per_line" type="int" value="40"/> -->
+	<!-- 	<param name="threshold_diff_occupancyV" type="double" value="0.2"/> -->
 	<!-- </node> -->
-	<node pkg="t_intern_assignment" name="dynamic_pc_extraction" type="dynamic_pc_extraction" output="screen">
+	<node pkg="t_intern_assignment" name="dynamic_pc_extraction_octree" type="dynamic_pc_extraction_octree" output="screen">
+		<remap from="/cloud" to="/velodyne_obstacles"/>
+		<remap from="/cloud/dynamic" to="/velodyne_obstacles/dynamic"/>
 		<param name="child_frame_name" type="string" value="/velodyne"/>
 		<param name="parent_frame_name" type="string" value="/odom"/>
-		<remap from="/cloud" to="/velodyne_obstacles"/>
-		<param name="voxel_size" type="double" value="1.0"/>
-		<param name="voxel_per_line" type="int" value="50"/>
-		<param name="threshold_diff_occupancyV" type="double" value="0.9"/>
+		<param name="voxel_size" type="double" value="0.7"/>
+		<param name="threshold_diff_occupancy" type="double" value="0.2"/>
 	</node>
-	<!-- <node pkg="t_intern_assignment" name="road_pc_extraction" type="road_pc_extraction" output="screen"> -->
-	<!-- 	<remap from="/cloud" to="/velodyne_clear"/> -->
-    <!--     <param name="threshold_curvature" value="0.1"/> -->
-	<!-- </node> -->
 </launch>
