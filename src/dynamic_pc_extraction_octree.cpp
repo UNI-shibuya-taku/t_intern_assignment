@@ -68,11 +68,15 @@ void DynamicPCExtraction::CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg
 		PCTransform();
 		Extraction();
 		Publication();
+		pc_last->header = pc_current->header;
+		*pc_last += *pc_static;
+	}
+	else{
+		*pc_last = *pc_current;
 	}
 	Visualization();
 
-	pc_last->header = pc_current->header;
-	*pc_last += *pc_current;
+	// *pc_last = *pc_current;
 }
 
 void DynamicPCExtraction::PCTransform(void)
@@ -150,20 +154,24 @@ void DynamicPCExtraction::Extraction(void)
 	/* for(size_t i=0;i<newPointIdxVector.size();++i){ */
 	/* 	pc_dynamic->points[i] = pc_current->points[newPointIdxVector[i]]; */
 	/* } */
+	std::sort(newPointIdxVector.begin(), newPointIdxVector.end());
 	int counter_static = 0;
 	int counter_dynamic = 0;
 	pc_dynamic->points.resize(newPointIdxVector.size());
 	pc_static->points.resize(pc_current->points.size() - newPointIdxVector.size());
-	for(size_t i=0;i<pc_current->points.size();++i){
-		if(i == newPointIdxVector[counter_dynamic]){
-			pc_dynamic->points[counter_dynamic] = pc_current->points[i];
-			counter_dynamic++;
-		}
-		else{
-			pc_static->points[counter_static] = pc_current->points[i];
-			counter_static++;
+	if(!newPointIdxVector.empty()){
+		for(size_t i=0;i<pc_current->points.size();++i){
+			if(i == (size_t)newPointIdxVector[counter_dynamic]){
+				pc_dynamic->points[counter_dynamic] = pc_current->points[i];
+				counter_dynamic++;
+			}
+			else{
+				pc_static->points[counter_static] = pc_current->points[i];
+				counter_static++;
+			}
 		}
 	}
+	else	*pc_static = *pc_current;
 
 	std::cout << "extraction time [s] = " << ros::Time::now().toSec() - time_start << std::endl;
 }
