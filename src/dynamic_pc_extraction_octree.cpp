@@ -28,10 +28,11 @@ class DynamicPCExtraction{
 		std::string child_frame_name;
 		std::string parent_frame_name;
 		double voxel_size;
+		int min_points_per_leaf;
 	public:
 		DynamicPCExtraction();
 		void CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg);
-		void PCTransform(void);
+		bool PCTransform(void);
 		void Extraction(void);
 		void PassThroughFilter(pcl::PointCloud<pcl::PointXYZ>::Ptr pc_in, pcl::PointCloud<pcl::PointXYZ>::Ptr pc_out, std::vector<double> range);
 		bool JudgeDynamic(pcl::PointCloud<pcl::PointXYZ>::Ptr voxel_current, pcl::PointCloud<pcl::PointXYZ>::Ptr voxel_last);
@@ -54,6 +55,8 @@ DynamicPCExtraction::DynamicPCExtraction()
 	std::cout << "parent_frame_name = " << parent_frame_name << std::endl;
 	nhPrivate.param("voxel_size", voxel_size, 1.0);
 	std::cout << "voxel_size = " << voxel_size << std::endl;
+	nhPrivate.param("min_points_per_leaf", min_points_per_leaf, 0);
+	std::cout << "min_points_per_leaf = " << min_points_per_leaf << std::endl;
 }
 
 void DynamicPCExtraction::CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg)
@@ -65,24 +68,29 @@ void DynamicPCExtraction::CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg
 	std::cout << "pc_current->points.size() = " << pc_current->points.size() << std::endl;
 
 	if(!pc_last->points.empty()){
-		PCTransform();
-		Extraction();
-		Publication();
-		pc_last->header = pc_current->header;
-		*pc_last += *pc_static;
+		if(PCTransform()){
+			Extraction();
+			Publication();
+			// *pc_last += *pc_static;
+			// pc_last->header = pc_current->header;
+		}
+		else	*pc_last = *pc_current;
 	}
 	else{
 		*pc_last = *pc_current;
 	}
 	Visualization();
 
-	// *pc_last = *pc_current;
+	*pc_last += *pc_current;
+	pc_last->header = pc_current->header;
+
+	std::cout << "pc_current->header.stamp = " << pc_current->header.stamp << std::endl;
 }
 
-void DynamicPCExtraction::PCTransform(void)
+bool DynamicPCExtraction::PCTransform(void)
 {
 	/*current*/
-	tf::StampedTransform tf_trans;
+	tf::StampedTransform tf_trans_current;
 	ros::Time time_current;
 	pcl_conversions::fromPCL(pc_current->header.stamp, time_current);
 	try{
@@ -90,12 +98,14 @@ void DynamicPCExtraction::PCTransform(void)
 			parent_frame_name,
 			pc_current->header.frame_id,
 			time_current,
-			tf_trans
+			tf_trans_current
 		);
 	}
-	catch (tf::TransformException ex){
-		ROS_ERROR("%s",ex.what());
+	catch(tf::TransformException ex){
+		std::cout << "Error: current tf listen" << std::endl;
+		ROS_ERROR("%s", ex.what());
 		ros::Duration(1.0).sleep();
+		return false;
 	}
 	/*last*/
 	tf::StampedTransform tf_trans_last;
@@ -109,23 +119,27 @@ void DynamicPCExtraction::PCTransform(void)
 			tf_trans_last
 		);
 	}
-	catch (tf::TransformException ex){
-		ROS_ERROR("%s",ex.what());
+	catch(tf::TransformException ex){
+		std::cout << "Error: last tf listen" << std::endl;
+		ROS_ERROR("%s", ex.what());
 		ros::Duration(1.0).sleep();
+		return false;
 	}
 	/*transformation*/
-	tf::Quaternion relative_rotation = tf_trans_last.getRotation()*tf_trans.getRotation().inverse();
+	tf::Quaternion relative_rotation = tf_trans_last.getRotation()*tf_trans_current.getRotation().inverse();
 	relative_rotation.normalize();	
 	Eigen::Quaternionf rotation(relative_rotation.w(), relative_rotation.x(), relative_rotation.y(), relative_rotation.z());
 	tf::Quaternion q_global_move(
-		tf_trans_last.getOrigin().x() - tf_trans.getOrigin().x(),
-		tf_trans_last.getOrigin().y() - tf_trans.getOrigin().y(),
-		tf_trans_last.getOrigin().z() - tf_trans.getOrigin().z(),
+		tf_trans_last.getOrigin().x() - tf_trans_current.getOrigin().x(),
+		tf_trans_last.getOrigin().y() - tf_trans_current.getOrigin().y(),
+		tf_trans_last.getOrigin().z() - tf_trans_current.getOrigin().z(),
 		0.0
 	);
 	tf::Quaternion q_local_move = tf_trans_last.getRotation().inverse()*q_global_move*tf_trans_last.getRotation();
 	Eigen::Vector3f offset(q_local_move.x(), q_local_move.y(), q_local_move.z());
 	pcl::transformPointCloud(*pc_last, *pc_last, offset, rotation);
+
+	return true;
 }
 
 void DynamicPCExtraction::Extraction(void)
@@ -147,7 +161,7 @@ void DynamicPCExtraction::Extraction(void)
 	octree.addPointsFromInputCloud();
 	/*get diff*/
 	// octree.getPointIndicesFromNewVoxels(newPointIdxVector);
-	octree.getPointIndicesFromNewVoxels(newPointIdxVector, 10);
+	octree.getPointIndicesFromNewVoxels(newPointIdxVector, min_points_per_leaf);
 
 	/*extract*/
 	/* pc_dynamic->points.resize(newPointIdxVector.size()); */
@@ -172,6 +186,7 @@ void DynamicPCExtraction::Extraction(void)
 		}
 	}
 	else	*pc_static = *pc_current;
+	std::cout << "pc_static->points.size() = " << pc_static->points.size() << std::endl;
 
 	std::cout << "extraction time [s] = " << ros::Time::now().toSec() - time_start << std::endl;
 }
@@ -204,6 +219,11 @@ void DynamicPCExtraction::Visualization(void)
 	viewer.addPointCloud(pc_dynamic, "pc_dynamic");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 0.0, 0.0, "pc_dynamic");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 4, "pc_dynamic");
+
+	/* #<{(|pc_static|)}># */
+	/* viewer.addPointCloud(pc_static, "pc_static"); */
+	/* viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 1.0, 0.0, "pc_static"); */
+	/* viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 4, "pc_static"); */
 	
 	viewer.spinOnce();
 }

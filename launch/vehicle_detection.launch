@@ -33,7 +33,8 @@
 		<remap from="/cloud/dynamic" to="/velodyne_obstacles/dynamic"/>
 		<param name="child_frame_name" type="string" value="/velodyne"/>
 		<param name="parent_frame_name" type="string" value="/odom"/>
-		<param name="voxel_size" type="double" value="3"/>
+		<param name="voxel_size" type="double" value="1.0"/>
+		<param name="min_points_per_leaf" type="int" value="0"/>
 	</node>
 	<node pkg="clustering_pcl" name="euclidean_clustering" type="euclidean_clustering" output="screen">
 		<remap from="/velodyne_points" to="/velodyne_obstacles/dynamic"/>
