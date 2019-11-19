@@ -28,13 +28,23 @@
 	<!-- 	<param name="voxel_per_line" type="int" value="40"/> -->
 	<!-- 	<param name="threshold_diff_occupancyV" type="double" value="0.2"/> -->
 	<!-- </node> -->
-	<node pkg="t_intern_assignment" name="dynamic_pc_extraction_octree" type="dynamic_pc_extraction_octree" output="screen">
+	<!-- <node pkg="t_intern_assignment" name="dynamic_pc_extraction_octree" type="dynamic_pc_extraction_octree" output="screen"> -->
+	<!-- 	<remap from="/cloud" to="/velodyne_obstacles"/> -->
+	<!-- 	<remap from="/cloud/dynamic" to="/velodyne_obstacles/dynamic"/> -->
+	<!-- 	<param name="child_frame_name" type="string" value="/velodyne"/> -->
+	<!-- 	<param name="parent_frame_name" type="string" value="/odom"/> -->
+	<!-- 	<param name="voxel_size" type="double" value="1.0"/> -->
+	<!-- 	<param name="min_points_per_leaf" type="int" value="0"/> -->
+	<!-- </node> -->
+	<node pkg="t_intern_assignment" name="dynamic_pc_extraction_octree_buffer" type="dynamic_pc_extraction_octree_buffer" output="screen">
 		<remap from="/cloud" to="/velodyne_obstacles"/>
 		<remap from="/cloud/dynamic" to="/velodyne_obstacles/dynamic"/>
 		<param name="child_frame_name" type="string" value="/velodyne"/>
 		<param name="parent_frame_name" type="string" value="/odom"/>
-		<param name="voxel_size" type="double" value="1.0"/>
-		<param name="min_points_per_leaf" type="int" value="0"/>
+		<param name="voxel_size" type="double" value="2.0"/>
+		<param name="min_points_per_leaf" type="int" value="10"/>
+		<param name="buffer_size" type="int" value="10"/>
+		<param name="threshhold_dynamic_likelihood" type="double" value="0.6"/>
 	</node>
 	<node pkg="clustering_pcl" name="euclidean_clustering" type="euclidean_clustering" output="screen">
 		<remap from="/velodyne_points" to="/velodyne_obstacles/dynamic"/>
