@@ -7,7 +7,7 @@
 		<param name="publish_rate" type="double" value="1"/>
 		<param name="child_frame_name" type="string" value="/velodyne"/>
 		<param name="parent_frame_name" type="string" value="/odom"/>
-		<param name="file_path" type="string" value="/home/amsl/ozaki/job_hunting/toyota/assignment/datasets/bike_bicycle[5]/2"/>
+		<param name="file_path" type="string" value="/home/amsl/ozaki/job_hunting/toyota/assignment/datasets/bike_bicycle[5]/1"/>
 	</node>
 
 	<!-- main -->

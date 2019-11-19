@@ -181,13 +181,16 @@ void VehicleDetection::Visualization(void)
 		viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5, name);
 
 		/*centroids*/
+		const int digits = 2;
+		std::vector<std::ostringstream> oss(3);
+		for(int j=0;j<velocities[i].size();++j)	oss[j] << std::fixed << std::setprecision(digits) << velocities[i](j);
 		std::string text = "(" 
-			+ std::to_string(velocities[i](0)) + ", " 
-			+ std::to_string(velocities[i](1)) + ", "
-			+ std::to_string(velocities[i](2)) +
+			+ oss[0].str() + ", "
+			+ oss[1].str() + ", "
+			+ oss[2].str() +
 		")";
 		std::string text_id = "text_" + std::to_string(i);
-		viewer.addText3D(text, centroids->points[i], 1.0, 0.0, 0.0, 0.0, "text_" + std::to_string(i));
+		viewer.addText3D(text, centroids->points[i], 1.0, 0.0, 0.0, 0.0, text_id);
 	}
 	
 	viewer.spinOnce();
