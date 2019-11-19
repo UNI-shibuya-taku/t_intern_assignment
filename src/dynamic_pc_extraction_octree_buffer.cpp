@@ -37,7 +37,6 @@ class DynamicPCExtraction{
 		void CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg);
 		bool PCTransform(void);
 		void Extraction(void);
-		void DivideDynamicStatic(const pcl::PointCloud<pcl::PointXYZ>::Ptr pc_reference, const pcl::PointCloud<pcl::PointXYZ>::Ptr pc_target, pcl::PointCloud<pcl::PointXYZ>::Ptr pc_result_dynamic, pcl::PointCloud<pcl::PointXYZ>::Ptr pc_result_static);
 		std::vector<int> GetDynamicIndices(const pcl::PointCloud<pcl::PointXYZ>::Ptr pc_reference, const pcl::PointCloud<pcl::PointXYZ>::Ptr pc_target);
 		void Publication(void);
 		void Visualization(void);
@@ -70,10 +69,12 @@ void DynamicPCExtraction::CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg
 {
 	/* std::cout << "CALLBACK PC" << std::endl; */
 
+	/*subscribe*/
 	pcl::fromROSMsg(*msg, *pc_current);
 	std::cout << "==========" << std::endl;
 	std::cout << "pc_current->points.size() = " << pc_current->points.size() << std::endl;
 
+	/*extract*/
 	if(!buffer_pc.empty()){
 		if(PCTransform()){
 			Extraction();
@@ -149,8 +150,6 @@ void DynamicPCExtraction::Extraction(void)
 {
 	double time_start = ros::Time::now().toSec();
 
-	// DivideDynamicStatic(pc_last, pc_current, pc_dynamic, pc_static);
-
 	/*initialize*/
 	pc_dynamic->points.clear();
 	/*octree*/
@@ -167,44 +166,6 @@ void DynamicPCExtraction::Extraction(void)
 	}
 
 	std::cout << "extraction time [s] = " << ros::Time::now().toSec() - time_start << std::endl;
-}
-
-void DynamicPCExtraction::DivideDynamicStatic(const pcl::PointCloud<pcl::PointXYZ>::Ptr pc_reference, const pcl::PointCloud<pcl::PointXYZ>::Ptr pc_target, pcl::PointCloud<pcl::PointXYZ>::Ptr pc_result_dynamic, pcl::PointCloud<pcl::PointXYZ>::Ptr pc_result_static)
-{
-	/*initialize*/
-	std::vector<int> newPointIdxVector;
-	pcl::octree::OctreePointCloudChangeDetector<pcl::PointXYZ> octree(voxel_size);
-	pc_result_dynamic->points.clear();
-	pc_result_static->points.clear();
-	/*last*/
-	octree.setInputCloud(pc_reference);
-	octree.addPointsFromInputCloud();
-	/*switch*/
-	octree.switchBuffers();	
-	/*current*/
-	octree.setInputCloud(pc_target);
-	octree.addPointsFromInputCloud();
-	/*get diff*/
-	octree.getPointIndicesFromNewVoxels(newPointIdxVector, min_points_per_leaf);
-	/*extract*/
-	std::sort(newPointIdxVector.begin(), newPointIdxVector.end());
-	int counter_static = 0;
-	int counter_dynamic = 0;
-	pc_result_dynamic->points.resize(newPointIdxVector.size());
-	pc_result_static->points.resize(pc_target->points.size() - newPointIdxVector.size());
-	if(!newPointIdxVector.empty()){
-		for(size_t i=0;i<pc_target->points.size();++i){
-			if(i == (size_t)newPointIdxVector[counter_dynamic]){
-				pc_result_dynamic->points[counter_dynamic] = pc_target->points[i];
-				counter_dynamic++;
-			}
-			else{
-				pc_result_static->points[counter_static] = pc_target->points[i];
-				counter_static++;
-			}
-		}
-	}
-	else	*pc_result_static = *pc_target;
 }
 
 std::vector<int> DynamicPCExtraction::GetDynamicIndices(const pcl::PointCloud<pcl::PointXYZ>::Ptr pc_reference, const pcl::PointCloud<pcl::PointXYZ>::Ptr pc_target)
@@ -245,11 +206,6 @@ void DynamicPCExtraction::Visualization(void)
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 0.0, 0.0, "pc_current");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, "pc_current");
 
-	/* #<{(|pc_last|)}># */
-	/* viewer.addPointCloud(pc_last, "pc_last"); */
-	/* viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 0.0, 1.0, "pc_last"); */
-	/* viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, "pc_last"); */
-
 	/*pc_store*/
 	pcl::PointCloud<pcl::PointXYZ>::Ptr pc_store {new pcl::PointCloud<pcl::PointXYZ>};
 	for(size_t i=0;i<buffer_pc.size();++i)	*pc_store += *buffer_pc[i];
@@ -261,16 +217,6 @@ void DynamicPCExtraction::Visualization(void)
 	viewer.addPointCloud(pc_dynamic, "pc_dynamic");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 0.0, 0.0, "pc_dynamic");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 4, "pc_dynamic");
-
-	/* #<{(|pc_static|)}># */
-	/* viewer.addPointCloud(pc_static, "pc_static"); */
-	/* viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 1.0, 0.0, "pc_static"); */
-	/* viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 4, "pc_static"); */
-
-	/* #<{(|pc_test|)}># */
-	/* viewer.addPointCloud(pc_test, "pc_test"); */
-	/* viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 1.0, 0.0, "pc_test"); */
-	/* viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 4, "pc_test"); */
 	
 	viewer.spinOnce();
 }

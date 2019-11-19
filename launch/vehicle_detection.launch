@@ -7,7 +7,7 @@
 		<param name="publish_rate" type="double" value="1"/>
 		<param name="child_frame_name" type="string" value="/velodyne"/>
 		<param name="parent_frame_name" type="string" value="/odom"/>
-		<param name="file_path" type="string" value="/home/amsl/ozaki/job_hunting/toyota/assignment/datasets/bike_bicycle[5]/1"/>
+		<param name="file_path" type="string" value="/home/amsl/ozaki/job_hunting/toyota/assignment/datasets/bike_bicycle[5]/2"/>
 	</node>
 
 	<!-- main -->
@@ -25,14 +25,14 @@
 		<remap from="/cloud/dynamic" to="/velodyne_obstacles/dynamic"/>
 		<param name="child_frame_name" type="string" value="/velodyne"/>
 		<param name="parent_frame_name" type="string" value="/odom"/>
-		<param name="voxel_size" type="double" value="2.0"/>
-		<param name="min_points_per_leaf" type="int" value="10"/>
+		<param name="voxel_size" type="double" value="1.0"/>
+		<param name="min_points_per_leaf" type="int" value="5"/>
 		<param name="buffer_size" type="int" value="10"/>
 		<param name="threshhold_dynamic_likelihood" type="double" value="0.6"/>
 	</node>
-	<node pkg="clustering_pcl" name="euclidean_clustering" type="euclidean_clustering" output="screen">
-		<remap from="/velodyne_points" to="/velodyne_obstacles/dynamic"/>
-		<param name="cluster_tolerance" type="double" value="0.2"/>
-		<param name="min_cluster_size" type="int" value="30"/>
+	<node pkg="t_intern_assignment" name="vehicle_detection" type="vehicle_detection" output="screen">
+		<remap from="/cloud" to="/velodyne_obstacles/dynamic"/>
+		<param name="cluster_tolerance" type="double" value="0.5"/>
+		<param name="min_cluster_size" type="int" value="20"/>
 	</node>
 </launch>
