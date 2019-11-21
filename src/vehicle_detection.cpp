@@ -26,6 +26,7 @@ class VehicleDetection{
 		/*parameters*/
 		double cluster_tolerance;
 		int min_cluster_size;
+		double association_distance;
 	public:
 		VehicleDetection();
 		void CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg);
@@ -40,12 +41,14 @@ VehicleDetection::VehicleDetection()
 	sub_pc = nh.subscribe("/cloud", 1, &VehicleDetection::CallbackPC, this);
 	viewer.setBackgroundColor(1, 1, 1);
 	viewer.addCoordinateSystem(1.0, "axis");
-	viewer.setCameraPosition(0.0, 0.0, 120.0, 0.0, 0.0, 0.0);
+	viewer.setCameraPosition(0.0, 0.0, 150.0, 0.0, 0.0, 0.0);
 
 	nhPrivate.param("cluster_tolerance", cluster_tolerance, 0.1);
-	nhPrivate.param("min_cluster_size", min_cluster_size, 100);
 	std::cout << "cluster_tolerance = " << cluster_tolerance << std::endl;
+	nhPrivate.param("min_cluster_size", min_cluster_size, 100);
 	std::cout << "min_cluster_size = " << min_cluster_size << std::endl;
+	nhPrivate.param("association_distance", association_distance, 1.0);
+	std::cout << "association_distance = " << association_distance << std::endl;
 }
 
 void VehicleDetection::CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg)
@@ -123,12 +126,11 @@ void VehicleDetection::Association(void)
 	std::vector<int> list_index;
 	std::vector<float> list_squared_distance;
 	velocities.resize(centroids->points.size(), Eigen::Vector3d(0.0, 0.0, 0.0));
-	double search_radius = 1.0;
 	/*search*/
 	if(!centroids_last->points.empty()){
 		kdtree.setInputCloud(centroids_last);
 		for(size_t i=0;i<centroids->points.size();++i){
-			if(kdtree.radiusSearch(centroids->points[i], search_radius, list_index, list_squared_distance)<=0)	std::cout << "kdtree error" << std::endl;
+			if(kdtree.radiusSearch(centroids->points[i], association_distance, list_index, list_squared_distance)<=0)	std::cout << "kdtree error" << std::endl;
 			if(!list_index.empty()){
 				ros::Time dt_ros;
 				pcl_conversions::fromPCL(centroids->header.stamp - centroids_last->header.stamp, dt_ros);
@@ -141,9 +143,9 @@ void VehicleDetection::Association(void)
 			}
 			else{
 				velocities[i] = {
-					0.0,
-					0.0,
-					0.0
+					NAN,
+					NAN,
+					NAN
 				};
 			}
 		}
@@ -181,16 +183,26 @@ void VehicleDetection::Visualization(void)
 		viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5, name);
 
 		/*centroids*/
-		const int digits = 2;
-		std::vector<std::ostringstream> oss(3);
-		for(int j=0;j<velocities[i].size();++j)	oss[j] << std::fixed << std::setprecision(digits) << velocities[i](j);
-		std::string text = "(" 
-			+ oss[0].str() + ", "
-			+ oss[1].str() + ", "
-			+ oss[2].str() +
-		")";
-		std::string text_id = "text_" + std::to_string(i);
-		viewer.addText3D(text, centroids->points[i], 1.0, 0.0, 0.0, 0.0, text_id);
+		if(!std::isnan(velocities[i](0)) && !std::isnan(velocities[i](1)) && !std::isnan(velocities[i](2))){
+			/*text*/
+			const int digits = 2;
+			std::vector<std::ostringstream> oss(3);
+			for(int j=0;j<velocities[i].size();++j)	oss[j] << std::fixed << std::setprecision(digits) << velocities[i](j);
+			std::string text = "(" 
+				+ oss[0].str() + ", "
+				+ oss[1].str() + ", "
+				+ oss[2].str() +
+			")";
+			std::string text_id = "text_" + std::to_string(i);
+			viewer.addText3D(text, centroids->points[i], 1.0, 0.0, 0.0, 0.0, text_id);
+			/*arrow*/
+			std::string arrow_id = "arrow_" + std::to_string(i);
+			pcl::PointXYZ tmp_end;
+			tmp_end.x = centroids->points[i].x + velocities[i](0);
+			tmp_end.y = centroids->points[i].y + velocities[i](1);
+			tmp_end.z = centroids->points[i].z + velocities[i](2);
+			viewer.addArrow(tmp_end, centroids->points[i], 1.0, 0.0, 0.0, false, arrow_id);
+		}
 	}
 	
 	viewer.spinOnce();
