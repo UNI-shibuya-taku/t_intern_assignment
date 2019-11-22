@@ -211,3 +211,5 @@ add_executable(dynamic_pc_extraction_octree_buffer src/dynamic_pc_extraction_oct
 target_link_libraries(dynamic_pc_extraction_octree_buffer ${catkin_LIBRARIES})
 add_executable(vehicle_detection src/vehicle_detection.cpp)
 target_link_libraries(vehicle_detection ${catkin_LIBRARIES})
+add_executable(pc_correction src/pc_correction.cpp)
+target_link_libraries(pc_correction ${catkin_LIBRARIES})
