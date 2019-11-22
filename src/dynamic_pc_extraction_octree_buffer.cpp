@@ -48,7 +48,7 @@ DynamicPCExtraction::DynamicPCExtraction()
 	sub_pc = nh.subscribe("/cloud", 1, &DynamicPCExtraction::CallbackPC, this);
 	pub_pc = nh.advertise<sensor_msgs::PointCloud2>("/cloud/dynamic", 1);
 	viewer.setBackgroundColor(1, 1, 1);
-	viewer.addCoordinateSystem(1.0, "axis");
+	viewer.addCoordinateSystem(3.0, "axis");
 	viewer.setCameraPosition(0.0, 0.0, 150.0, 0.0, 0.0, 0.0);
 
 	nhPrivate.param("child_frame_name", child_frame_name, std::string("/lidar"));

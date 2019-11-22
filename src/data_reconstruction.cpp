@@ -33,6 +33,7 @@ class DataReconstruction{
 		boost::property_tree::ptree pt;
 		geometry_msgs::PoseStamped pose;
 		/*parameters*/
+		double sampling_rate;
 		double publish_rate;
 		std::string child_frame_name;
 		std::string parent_frame_name;
@@ -57,7 +58,7 @@ class DataReconstruction{
 		void ImageCVToROS(void);
 		void LoadJason(int number);
 		void PtreeToPose(void);
-		void Publication(void);
+		void Publication(ros::Time pub_time);
 		//void Visualization(void);
 		double DegToRad(double deg);
 		double PiToPi(double angle);
@@ -76,6 +77,8 @@ DataReconstruction::DataReconstruction()
 
 	nhPrivate.param("publish_rate", publish_rate, 10.0);
 	std::cout << "publish_rate = " << publish_rate << std::endl;
+	nhPrivate.param("sampling_rate", sampling_rate, 10.0);
+	std::cout << "sampling_rate = " << sampling_rate << std::endl;
 	nhPrivate.param("child_frame_name", child_frame_name, std::string("/lidar"));
 	std::cout << "child_frame_name = " << child_frame_name << std::endl;
 	nhPrivate.param("parent_frame_name", parent_frame_name, std::string("/odom"));
@@ -106,6 +109,7 @@ DataReconstruction::DataReconstruction()
 
 void DataReconstruction::LoopExecution(void)
 {
+	ros::Time start_time = ros::Time::now();
 	ros::Rate loop_rate(publish_rate);
 	int counter = 0;
 	while(ros::ok()){
@@ -115,7 +119,8 @@ void DataReconstruction::LoopExecution(void)
 		LoadJason(counter);
 		PtreeToPose();
 
-		Publication();
+		ros::Time pub_time = start_time + ros::Duration(1.0/sampling_rate*counter);
+		Publication(pub_time);
 		//Visualization();
 
 		counter++;
@@ -281,10 +286,8 @@ void DataReconstruction::PtreeToPose(void)
 	pose.pose.orientation.w = values[6];
 }
 
-void DataReconstruction::Publication(void)
+void DataReconstruction::Publication(ros::Time pub_time)
 {
-	ros::Time pub_time = ros::Time::now();
-
 	/*pc*/
 	sensor_msgs::PointCloud2 pc_ros;
 	pcl::toROSMsg(*cloud, pc_ros);

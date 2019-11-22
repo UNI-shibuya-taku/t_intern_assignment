@@ -4,10 +4,13 @@
 
 	<!-- data reconstruction -->
 	<node pkg="t_intern_assignment" name="data_reconstruction" type="data_reconstruction" output="screen">
-		<param name="publish_rate" type="double" value="1"/>
+		<param name="sampling_rate" type="double" value="10.0"/>
+		<param name="publish_rate" type="double" value="1.0"/>
 		<param name="child_frame_name" type="string" value="/velodyne"/>
 		<param name="parent_frame_name" type="string" value="/odom"/>
-		<param name="file_path" type="string" value="/home/amsl/ozaki/job_hunting/toyota/assignment/datasets/bike_bicycle[5]/1"/>
+		<!-- <param name="file_path" type="string" value="/home/amsl/ozaki/job_hunting/toyota/assignment/datasets/bike_bicycle[5]/1"/> -->
+		<!-- <param name="file_path" type="string" value="/home/amsl/ozaki/job_hunting/toyota/assignment/datasets/bike_bicycle[5]/2"/> -->
+		<param name="file_path" type="string" value="/home/amsl/ozaki/job_hunting/toyota/assignment/datasets/car[5]/2"/>
 	</node>
 
 	<!-- main -->
@@ -34,6 +37,6 @@
 		<remap from="/cloud" to="/velodyne_obstacles/dynamic"/>
 		<param name="cluster_tolerance" type="double" value="0.5"/>
 		<param name="min_cluster_size" type="int" value="10"/>
-		<param name="association_distance" type="double" value="0.5"/>
+		<param name="association_distance" type="double" value="1.0"/>
 	</node>
 </launch>
