@@ -11,6 +11,11 @@
 		<param name="file_path" type="string" value="/home/amsl/ozaki/job_hunting/toyota/assignment/datasets/bike_bicycle[5]/1"/>
 	</node>
 
+	<!-- pc correction -->
+	<!-- <node pkg="t_intern_assignment" name="pc_correction" type="pc_correction" output="screen"> -->
+	<!-- 	<param name="parent_frame_name" type="string" value="/odom"/> -->
+	<!-- </node> -->
+
 	<!-- main -->
 	<include file="$(find velodyne_pointcloud)/launch/32e_points.launch"/>
     <node pkg="nodelet" type="nodelet" name="heightmap_nodelet"
@@ -20,6 +25,7 @@
         <param name="grid_dimensions" value="400"/>
         <param name="height_threshold" value="0.1"/>
 		<remap from="/velodyne_points" to="/cloud"/>
+		<!-- <remap from="/velodyne_points" to="/cloud/corrected"/> -->
     </node>
 	<node pkg="t_intern_assignment" name="dynamic_pc_extraction_octree_buffer" type="dynamic_pc_extraction_octree_buffer" output="screen">
 		<remap from="/cloud" to="/velodyne_obstacles"/>
