@@ -21,6 +21,7 @@ class ImageToPC{
 		cv::Mat img_intensity;
 		cv::Mat img_normal;
 		/*parameters*/
+		double sampling_rate;
 		double publish_rate;
 		std::string frame_id_name;
 		std::string file_path;
@@ -41,7 +42,7 @@ class ImageToPC{
 		void InputPC(void);
 		void GetXYZNormal(int row, int col, double depth, double& x, double& y, double& z, double& nx, double& ny, double& nz);
 		double ComputeCurvature(double nx, double ny, double nz);
-		void Publication(void);
+		void Publication(ros::Time pub_time);
 		void Visualization(void);
 		double DegToRad(double deg);
 		double PiToPi(double angle);
@@ -86,12 +87,14 @@ ImageToPC::ImageToPC()
 
 void ImageToPC::LoopExecution(void)
 {
+	ros::Time start_time = ros::Time::now();
 	ros::Rate loop_rate(publish_rate);
 	int counter = 0;
 	while(ros::ok()){
 		LoadImage(counter);
 		InputPC();
-		Publication();
+		ros::Time pub_time = start_time + ros::Duration(1.0/sampling_rate*counter);
+		Publication(pub_time);
 		Visualization();
 
 		counter++;
@@ -205,7 +208,7 @@ double ImageToPC::ComputeCurvature(double nx, double ny, double nz)
 	return e[0]/(e[1] + e[1] + e[2]);
 }
 
-void ImageToPC::Publication(void)
+void ImageToPC::Publication(ros::Time pub_time)
 {
 	/*pc*/
 	sensor_msgs::PointCloud2 pc_ros;
