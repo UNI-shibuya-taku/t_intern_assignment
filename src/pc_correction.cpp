@@ -140,7 +140,7 @@ void PCCorrection::Correction(void)
 		double angle = ComputeAngle(pc_current->points[i]);
 		angle = ZeroTo2Pi(angle);
 		/* if(std::isnan(angle))	std::cout << "pc_current->points[i] = " << pc_current->points[i] << std::endl; */
-		double ratio = angle/(2*M_PI);
+		double ratio = angle/(2*M_PI) - 1.0;
 		Eigen::Vector3d correction = ratio*local_move_xyz;
 		pcl::PointXYZ tmp_p;
 		/* tmp_p.x = pc_current->points[i].x + correction[0]; */
@@ -159,12 +159,15 @@ void PCCorrection::Correction(void)
 		tmp_p.y = q_point.y();
 		tmp_p.z = q_point.z();
 		pc_corrected->points.push_back(tmp_p);
+		
+		std::cout << "pc_current->points[i] = " << pc_current->points[i] << std::endl;
+		std::cout << "pc_corrected->points[i] = " << pc_corrected->points[i] << std::endl;
 	}
 }
 
 double PCCorrection::ComputeAngle(pcl::PointXYZ p)
 {
-	return acos(p.x/sqrt(p.x*p.x + p.y*p.y));
+	return atan2(p.y, p.x);
 }
 
 double PCCorrection::ZeroTo2Pi(double angle)
