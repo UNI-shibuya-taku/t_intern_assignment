@@ -138,7 +138,8 @@ void PCCorrection::Correction(void)
 	pc_corrected->points.clear();
 	for(size_t i=0;i<pc_current->points.size();++i){
 		double angle = ComputeAngle(pc_current->points[i]);
-		angle = ZeroTo2Pi(angle);
+		// angle = ZeroTo2Pi(angle);
+		angle = M_PI - angle;
 		/* if(std::isnan(angle))	std::cout << "pc_current->points[i] = " << pc_current->points[i] << std::endl; */
 		double ratio = angle/(2*M_PI) - 1.0;
 		Eigen::Vector3d correction = ratio*local_move_xyz;
