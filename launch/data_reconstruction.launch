@@ -1,12 +1,15 @@
 <launch>
 	<!-- rviz -->
-	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find t_intern_assignment)/rviz_config/data_reconstruction.rviz"/>
+	<!-- <node pkg="rviz" type="rviz" name="rviz" args="&#45;d $(find t_intern_assignment)/rviz_config/data_reconstruction.rviz"/> -->
 
 	<!-- data reconstruction -->
 	<node pkg="t_intern_assignment" name="data_reconstruction" type="data_reconstruction" output="screen">
-		<param name="publish_rate" type="double" value="1"/>
+		<param name="sampling_rate" type="double" value="10.0"/>
+		<param name="publish_rate" type="double" value="2.0"/>
 		<param name="child_frame_name" type="string" value="/velodyne"/>
 		<param name="parent_frame_name" type="string" value="/odom"/>
 		<param name="file_path" type="string" value="/home/amsl/ozaki/job_hunting/toyota/assignment/datasets/bike_bicycle[5]/1"/>
+		<!-- <param name="file_path" type="string" value="/home/amsl/ozaki/job_hunting/toyota/assignment/datasets/bike_bicycle[5]/2"/> -->
+		<!-- <param name="file_path" type="string" value="/home/amsl/ozaki/job_hunting/toyota/assignment/datasets/car[5]/2"/> -->
 	</node>
 </launch>

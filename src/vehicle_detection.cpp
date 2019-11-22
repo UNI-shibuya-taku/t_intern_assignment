@@ -48,7 +48,7 @@ VehicleDetection::VehicleDetection()
 	sub_pc = nh.subscribe("/cloud", 1, &VehicleDetection::CallbackPC, this);
 	viewer.setBackgroundColor(1, 1, 1);
 	viewer.addCoordinateSystem(3.0, "axis");
-	viewer.setCameraPosition(0.0, 0.0, 150.0, 0.0, 0.0, 0.0);
+	viewer.setCameraPosition(0.0, 0.0, 180.0, 0.0, 0.0, 0.0);
 
 	nhPrivate.param("parent_frame_name", parent_frame_name, std::string("/odom"));
 	std::cout << "parent_frame_name = " << parent_frame_name << std::endl;
@@ -147,6 +147,7 @@ void VehicleDetection::Transformation(void)
 		q_local_move_self.y()/dt,
 		q_local_move_self.z()/dt
 	};
+	std::cout << "self_velocity.norm() = " << self_velocity.norm() << std::endl;
 }
 
 void VehicleDetection::Clustering(void)
@@ -217,7 +218,7 @@ void VehicleDetection::Association(void)
 					(centroids->points[i].z - centroids_last->points[list_index[0]].z)/dt
 				};
 				/*relative to absolute*/
-				vehicle_velocities[i] += self_velocity;
+				// vehicle_velocities[i] += self_velocity;
 			}
 			else{
 				vehicle_velocities[i] = {
