@@ -139,9 +139,9 @@ void PCCorrection::Correction(void)
 	for(size_t i=0;i<pc_current->points.size();++i){
 		double angle = ComputeAngle(pc_current->points[i]);
 		// angle = ZeroTo2Pi(angle);
-		/* angle = M_PI - angle; */
-		if(angle < 0)	angle *= -1;
-		else	angle = 2*M_PI - angle;
+		angle = M_PI - angle;
+		/* if(angle < 0)	angle *= -1; */
+		/* else	angle = 2*M_PI - angle; */
 		/* if(std::isnan(angle))	std::cout << "pc_current->points[i] = " << pc_current->points[i] << std::endl; */
 		double ratio = 1.0 - angle/(2*M_PI);
 		Eigen::Vector3d correction = -ratio*local_move_xyz;
@@ -149,13 +149,13 @@ void PCCorrection::Correction(void)
 		/* tmp_p.x = pc_current->points[i].x + correction[0]; */
 		/* tmp_p.y = pc_current->points[i].y + correction[1]; */
 		/* tmp_p.z = pc_current->points[i].z + correction[2]; */
-		tf::Quaternion q_zero(0.0, 0.0, 0.0, 1.0);
 		tf::Quaternion q_point(
 			pc_current->points[i].x + correction[0],
 			pc_current->points[i].y + correction[1],
 			pc_current->points[i].z + correction[2],
 			0.0
 		);
+		tf::Quaternion q_zero(0.0, 0.0, 0.0, 1.0);
 		tf::Quaternion q_rotation = q_zero.slerp(q_relative_rotation.inverse(), ratio);
 		q_point = q_rotation*q_point*q_rotation.inverse();
 		tmp_p.x = q_point.x();
@@ -163,8 +163,8 @@ void PCCorrection::Correction(void)
 		tmp_p.z = q_point.z();
 		pc_corrected->points.push_back(tmp_p);
 		
-		std::cout << "pc_current->points[i] = " << pc_current->points[i] << std::endl;
-		std::cout << "pc_corrected->points[i] = " << pc_corrected->points[i] << std::endl;
+		/* std::cout << "pc_current->points[i] = " << pc_current->points[i] << std::endl; */
+		/* std::cout << "pc_corrected->points[i] = " << pc_corrected->points[i] << std::endl; */
 	}
 }
 
